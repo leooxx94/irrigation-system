@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Irrigazione – Server</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+
+<style>
+.container {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 10px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.switch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+}
+
+.switch.small {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+.switch.small input { display: none; }
+
+.switch.small .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 34px;
+}
+.switch.small .slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+.switch-form {
+  display: flex;
+  margin: 0;   /* elimina margine extra */
+  padding: 0;
+}
+.switch.small input:checked + .slider { background-color: #4CAF50; }
+.switch.small input:checked + .slider:before { transform: translateX(16px); }
+
+
+form { margin-bottom: 30px; }
+/* Rende più piccoli gli input orari */
+input[type="time"], 
+select.time-select {
+  font-size: 1rem;
+  padding: 4px 6px;
+  width: 150px;
+  height: 45px;
+  box-sizing: border-box;
+}
+
+.days-container label {
+  display: inline-block !important;
+  margin-right: 8px !important;
+}
+
+button {
+  padding: 8px 10px !important;
+  font-size: 0.9rem !important;
+  background-color: #4CAF50 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+}
+button:hover { background-color: #45a049 !important; }
+
+/* Tabelle custom */
+table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  margin-top: 10px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+}
+th, td {
+  padding: 10px !important;
+  text-align: center !important;
+}
+th {
+  background-color: #bd8e28 !important;
+  color: white !important;
+}
+tr:nth-child(even) { background-color: #f9f9f9 !important; }
+tr:hover { background-color: #e0f7e0 !important; }
+
+a { text-decoration: none !important; color: #f44336 !important; }
+a:hover { text-decoration: underline !important; }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<section id="controlli">
+  <div class="switch-row">
+    <!-- Sistema abilitato -->
+    <form method="POST" action="{{ url_for('toggle') }}" class="switch-form">
+      <div class="switch-item">
+        <span class="label">Sistema abilitato</span>
+        <label class="switch small">
+          <input type="checkbox" name="enabled" onchange="this.form.submit()" {% if s.enabled %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </form>
+
+    <!-- Relè manuale -->
+    <div class="switch-item">
+      <span class="label">Relè manuale</span>
+      <label class="switch small">
+        <input type="checkbox" id="manualRelaySwitch" onchange="toggleManualRelay(this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+</section>
+<hr>
+<section id="aggiungi">
+<h3>Aggiungi schedulazione</h3>
+<br>
+<form id="scheduleForm">
+  Ora inizio: <input type="time" name="start_time" step="1" required><br>
+  Ora fine: <input type="time" name="end_time" step="1" required><br><br>
+
+  <div class="days-container">
+    <label><input type="checkbox" name="days" value="1"> Lun</label>
+    <label><input type="checkbox" name="days" value="2"> Mar</label>
+    <label><input type="checkbox" name="days" value="3"> Mer</label>
+    <label><input type="checkbox" name="days" value="4"> Gio</label>
+    <label><input type="checkbox" name="days" value="5"> Ven</label>
+    <label><input type="checkbox" name="days" value="6"> Sab</label>
+    <label><input type="checkbox" name="days" value="7"> Dom</label>
+  </div><br>
+
+  <button type="submit">Aggiungi</button>
+</form>
+</section>
+<hr>
+<section id="schedulazioni">
+<h4>Schedulazioni esistenti</h4>
+<table>
+  <tr><th>ID</th><th>Inizio</th><th>Fine</th><th>Giorni</th><th>Azioni</th></tr>
+  {% for sched in schedules %}
+  <tr>
+    <td>{{ sched[0] }}</td>
+    <td>{{ sched[1] }}</td>
+    <td>{{ sched[2] }}</td>
+    <td>{{ sched[3] }}</td>
+    <td><a href="/delete_schedule/{{ sched[0] }}">Elimina</a></td>
+  </tr>
+  {% endfor %}
+</table>
+</section>
+<br><br>
+<section id="heartbeat">
+  <h4>Ultimi heartbeat</h4>
+  <table>
+    <tr><th>Timestamp</th><th>Dispositivo</th><th>IP</th></tr>
+    {% for hb in heartbeats %}
+    <tr>
+      <td>{{ hb[0] }}</td>
+      <td>{{ hb[1] }}</td>
+      <td>{{ hb[2] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<script>
+document.getElementById("scheduleForm").addEventListener("submit", async function(e){
+    e.preventDefault();
+    const start_time = this.start_time.value;
+    const end_time = this.end_time.value;
+    
+    // crea un array di numeri per i giorni selezionati
+    const days = Array.from(this.querySelectorAll('input[name="days"]:checked')).map(cb => parseInt(cb.value));
+
+    await fetch('/add_schedule', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({start_time, end_time, days})
+    });
+    location.reload();
+});
+
+function toggleManualRelay(state) {
+  fetch('/toggle_relay', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state })
+  });
+}
+
+</script>
+
+</div>
+</body>
+</html>
